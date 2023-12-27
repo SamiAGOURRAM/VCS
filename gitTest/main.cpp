@@ -49,9 +49,21 @@ public:
 
 
 std::string getFileHash(const fs::path& path) {
-    // Implement a function to calculate the hash of a file
-    // For example, you could use SHA-1, MD5, or any other hash function
-    // ...
+    std::ifstream fileStream(path, std::ios::binary);
+    if (!fileStream) {
+        throw std::runtime_error("Cannot open file: " + path.string());
+    }
+
+    std::ostringstream ss;
+    ss << fileStream.rdbuf();
+    std::string fileContent = ss.str();
+
+    std::hash<std::string> hasher;
+    size_t hashValue = hasher(fileContent);
+
+    std::stringstream hashStream;
+    hashStream << hashValue;
+    return hashStream.str();
 }
 
 
@@ -78,6 +90,9 @@ void add(const std::string& path) {
                             fs::remove_all(destinationPath);
                         }
                         fs::copy(entry.path(), destinationPath, copyOptions);
+                    }
+                    else{
+                        std::cout << "should not copy";
                     }
                 } catch (const std::exception& e) {
                     std::cerr << "Error processing file or directory: " << e.what() << std::endl;
@@ -209,7 +224,7 @@ int main() {
     //vcs.init();
 
 // 
-    //vcs.add(".");
+    vcs.add(".");
     //vcs.commit("Initial commit");
 
     std::cout << findLastCommitFile("test.txt");

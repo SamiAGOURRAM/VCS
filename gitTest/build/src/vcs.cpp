@@ -81,56 +81,46 @@ bool VCS::addInLog(std::string commitFolder, std::string author, std::string dat
                   const std::string& message, size_t filesChanged, size_t filesCreated) {
         std::string logPath = "log.json";
         std::ifstream inFile(logPath);
-        std::stringstream buffer;
-
-        // Read the existing content
-        if (inFile.is_open()) {
-            buffer << inFile.rdbuf();
-            inFile.close();
-        }
-
-        std::string logContent = buffer.str();
+        std::string logContent((std::istreambuf_iterator<char>(inFile)), std::istreambuf_iterator<char>());
+        inFile.close();
 
         // Extracting only the last part of the commitFolder
-        std::string commitId = commitFolder.substr(commitFolder.find_last_of("/") + 1);
+        std::string commitId = commitFolder.substr(commitFolder.find_last_of('/') + 1);
 
         // Remove newline from the date if it exists
-        date.erase(std::remove(date.begin(), date.end(), '\n'), date.end());
+        std::string formattedDate = date;
+        formattedDate.erase(std::remove(formattedDate.begin(), formattedDate.end(), '\n'), formattedDate.end());
 
-        // Constructing the new log entry
+        // Constructing the new log entry with newlines for pretty-printing
         std::string entry = "\"" + commitId + "\":{"
                                               "\"Author\":\"" + author + "\","
-                                                                         "\"Date\":\"" + date + "\","
-                                                                                                "\"Message\":\"" + message + "\","
-                                                                                                                             "\"Files Changed\":" + std::to_string(filesChanged) + ","
-                                                                                                                                                                                   "\"Files Created\":" + std::to_string(filesCreated) + "}";
+                                                                         "\"Date\":\"" + formattedDate + "\","
+                                                                                                         "\"Message\":\"" + message + "\","
+                                                                                                                                      "\"Files Changed\":" + std::to_string(filesChanged) + ","
+                                                                                                                                                                                            "\"Files Created\":" + std::to_string(filesCreated) + "}";
 
-        // Add new entry to the log
-        if (logContent.empty() || logContent == "{}") {  // Handle empty log file
-            logContent = "{" + entry + "}";
-        } else {
-            // Append new entry before the last closing brace
-            size_t insertPos = logContent.rfind('}');
-            if (insertPos != std::string::npos) {
-                logContent.insert(insertPos, "," + entry);
-            } else {
-                // If the file is not empty and does not contain a closing brace,
-                // there's a format error in the file.
-                std::cerr << "Error: log.json format error.\n";
-                return false;
-            }
-        }
+        // Determine whether we need to prepend a comma
+        std::string prefix = (logContent.empty() || logContent == "{}") ? "" : ",\n";
 
-        // Write the updated content back to the file
-        std::ofstream outFile(logPath);
-        if (outFile.is_open()) {
-            outFile << logContent;
-            outFile.close();
-            return true;
-        } else {
+        // Open file in truncate mode to overwrite
+        std::ofstream outFile(logPath, std::ios::trunc);
+        if (!outFile.is_open()) {
             std::cerr << "Error: Unable to open log.json for writing.\n";
             return false;
         }
+
+        // If the log was empty or contained only {}, we start a new JSON object
+        if (logContent.empty() || logContent == "{}") {
+            outFile << "{\n" << entry << "\n}";
+        } else {
+            // Otherwise, we insert the new entry before the closing brace
+            size_t lastBracePos = logContent.find_last_of('}')-1;
+            logContent.insert(lastBracePos, prefix + entry);
+            outFile << logContent;
+        }
+
+        outFile.close();
+        return true;
     }
 
 

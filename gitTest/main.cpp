@@ -206,7 +206,8 @@ void commit(const std::string& message) {
 }
 
 // Add more filenames to ignore if needed   
-bool shouldIgnore(const std::string& filename) {  return filename == "main.cpp" || filename == "main.exe" || filename == ".git"; }
+bool shouldIgnore(const std::string& filename) {  
+    return filename == "main.cpp" || filename == "main.exe" || filename == ".git" || filename == "build"; }
 
 void revertDirectory(const fs::directory_entry& source, const std::string& destinationPath) {
     if (fs::exists(destinationPath)) {

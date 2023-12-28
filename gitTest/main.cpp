@@ -114,66 +114,94 @@ void add(const std::string& path) {
 }
 
 
+
+std::vector<std::string> readFileLines(const std::string& filePath) {
+    std::vector<std::string> lines;
+    std::ifstream file(filePath);
+    std::string line;
+    while (std::getline(file, line)) {
+        lines.push_back(line);
+    }
+    return lines;
+}
+
+void writeDifferences(const std::string& oldFilePath, const std::string& newFilePath, std::ofstream& diffFile) {
+    auto oldLines = readFileLines(oldFilePath);
+    auto newLines = readFileLines(newFilePath);
+
+    size_t oldSize = oldLines.size();
+    size_t newSize = newLines.size();
+    size_t maxLines = std::max(oldSize, newSize);
+
+    for (size_t i = 0; i < maxLines; ++i) {
+        if (i >= oldSize) {
+            diffFile << "+ " << newLines[i] << "\n";
+        } else if (i >= newSize) {
+            diffFile << "- " << oldLines[i] << "\n";
+        } else if (oldLines[i] != newLines[i]) {
+            diffFile << "- " << oldLines[i] << "\n";
+            diffFile << "+ " << newLines[i] << "\n";
+        }
+    }
+}
+
+
+void writeNewFileContents(const std::string& filePath, std::ofstream& commitFile) {
+    auto lines = readFileLines(filePath);
+    for (const auto& line : lines) {
+        commitFile << "+ " << line << "\n";
+    }
+}
+
 void commit(const std::string& message) {
     if (fs::is_empty(".git/staging")) {
         std::cerr << "Error: Staging area is empty. Nothing to commit.\n";
         return;
     }
 
-    auto timestamp = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
+    auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
     std::string commitFolder = ".git/commits/" + std::to_string(timestamp);
 
-    try {
-        // Ensure the commit folder exists
-        fs::create_directories(commitFolder);
+    std::vector<std::string> modifiedFiles;
+    std::vector<std::string> newFiles;
 
-        // Move files from staging area to the commit folder
+    try {
+        fs::create_directories(commitFolder);
+        std::ofstream commitFile(commitFolder + "/commit_info.txt");
+
         for (const auto& entry : fs::directory_iterator(".git/staging")) {
-            if (!fs::exists(entry.path())) {
-                std::cerr << "Warning: File not found, skipping: " << entry.path() << std::endl;
-                continue;
+            std::string filename = entry.path().filename().string();
+            fs::path lastCommitFile = findLastCommitFile(filename);
+
+            if (!lastCommitFile.empty()) {
+                if (getFileHash(entry.path()) != getFileHash(lastCommitFile)) {
+                    modifiedFiles.push_back(filename);
+                    // Write differences for modified files
+                    commitFile << "Modified: " << filename << "\n";
+                    writeDifferences(lastCommitFile.string(), entry.path().string(), commitFile);
+                }
+            } else {
+                newFiles.push_back(filename);
+                commitFile << "Created: " << filename << "\n";
+                writeNewFileContents(entry.path().string(), commitFile);
             }
-            std::string destination = commitFolder + "/" + entry.path().filename().string();
-            fs::copy(entry.path(), destination);
+            fs::copy(entry.path(), commitFolder + "/" + filename);
         }
 
-        // Write commit information to a file
-        std::ofstream commitFile(commitFolder + "/commit_info.txt");
-        commitFile << "Author: <Your Name>\n";
-        commitFile << "Date: " << ctime(&timestamp);
-        commitFile << "Message: " << message << "\n";
+        // Logic to find deleted files would go here
+        // ...
 
-        // Clear the staging area
+        commitFile << "Author: <Your Name>\n";
+        commitFile << "Date: " << std::ctime(&timestamp);
+        commitFile << "Message: " << message << "\n";
+        commitFile << "Files Changed: " << modifiedFiles.size() + newFiles.size()  << "\n";
+        commitFile << "Files Created: " << newFiles.size() << "\n";
+
         fs::remove_all(".git/staging");
         fs::create_directory(".git/staging");
     } catch (const std::exception& e) {
         std::cerr << "Error during commit: " << e.what() << std::endl;
-    }
-}
-
-
-
-
-void revert(const std::string& commitFolder) {
-    // Revert to a specific commit by copying files and directories from the commit folder to the current directory
-    for (const auto& entry : fs::directory_iterator(commitFolder)) {
-        if (entry.is_regular_file() || entry.is_directory()) {
-            if (entry.path().filename() == "commit_info.txt") {
-                // Skip copying commit_info.txt
-                continue;
-            }
-
-            std::string destinationPath = (fs::current_path() / entry.path().filename()).string();
-            try {
-                if (entry.is_directory()) {
-                    revertDirectory(entry, destinationPath);
-                } else {
-                    revertFile(entry, destinationPath);
-                }
-            } catch (const std::exception& e) {
-                std::cerr << "Error reverting file or directory: " << e.what() << std::endl;
-            }
-        }
     }
 }
 
@@ -225,9 +253,7 @@ int main() {
 
 // 
     vcs.add(".");
-    //vcs.commit("Initial commit");
-
-    std::cout << findLastCommitFile("test.txt");
+    vcs.commit("commit information");
 
     // Make changes to files...
 

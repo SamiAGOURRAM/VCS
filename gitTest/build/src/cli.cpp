@@ -57,7 +57,7 @@ void CLI::handleCommitCommand(const std::string& message) const {
 
 void CLI::handleRollbackCommand(const std::string& commitId) const {
     vcsController.revert(commitId);
-    std::cout << "Rolled back to commit: " << commitId << std::endl;
+    std::cout << "Rolled back to commit: "  << std::endl;
 }
 
 void CLI::displayUsage() const {

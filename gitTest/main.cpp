@@ -45,8 +45,12 @@ public:
         fs::create_directory(".git");
         fs::create_directory(".git/commits");
         fs::create_directory(".git/staging");
+        if (!fs::exists("log.json")) {
+            std::ofstream file("log.json");
+            file << "{}"; // Initializes the file with an empty JSON object
+            file.close();
+        }
     }
-
 
 std::string getFileHash(const fs::path& path) {
     std::ifstream fileStream(path, std::ios::binary);
@@ -67,6 +71,51 @@ std::string getFileHash(const fs::path& path) {
 }
 
 
+bool addInLog(const std::string& commitFolder, const std::string& author, const std::string& date,
+              const std::string& message, size_t filesChanged, size_t filesCreated) {
+    std::string logPath = "log.json";
+    std::ifstream inFile(logPath);
+    std::stringstream buffer;
+
+    // Read the existing content
+    if (inFile.is_open()) {
+        buffer << inFile.rdbuf();
+        inFile.close();
+    }
+
+    std::string logContent = buffer.str();
+
+    // Extracting only the last part of the commitFolder
+    std::string commitId = commitFolder.substr(commitFolder.find_last_of("/") + 1);
+
+    // Constructing the new log entry
+    std::string entry = "\"" + commitId + "\":{"
+                        "\"Author\":\"" + author + "\","
+                        "\"Date\":\"" + date + "\","
+                        "\"Message\":\"" + message + "\","
+                        "\"Files Changed\":" + std::to_string(filesChanged) + ","
+                        "\"Files Created\":" + std::to_string(filesCreated) + "}";
+
+    // Add new entry to the log
+    if (logContent.empty() || logContent == "{}") {  // Handle empty log file
+        logContent = "{" + entry + "}";
+    } else {
+        // Append new entry before the last closing brace
+        size_t insertPos = logContent.rfind('}');
+        logContent.insert(insertPos, "," + entry);
+    }
+
+    // Write the updated content back to the file
+    std::ofstream outFile(logPath);
+    if (outFile.is_open()) {
+        outFile << logContent;
+        outFile.close();
+        return true;
+    } else {
+        std::cerr << "Error: Unable to open log.json for writing.\n";
+        return false;
+    }
+}
 void add(const std::string& path) {
     const auto copyOptions = fs::copy_options::overwrite_existing | fs::copy_options::recursive;
 
@@ -203,11 +252,21 @@ void commit(const std::string& message) {
     } catch (const std::exception& e) {
         std::cerr << "Error during commit: " << e.what() << std::endl;
     }
+
+    std::string authorName = "<Your Name>"; // Replace with actual author name or variable
+    std::string dateString = std::ctime(&timestamp); // Convert timestamp to readable date
+
+    // After a successful commit:
+    if (addInLog(commitFolder, authorName, dateString, message, modifiedFiles.size(), newFiles.size())) {
+        std::cout << "Commit logged successfully.\n";
+    } else {
+        std::cerr << "Failed to log commit.\n";
+    }
 }
 
 // Add more filenames to ignore if needed   
 bool shouldIgnore(const std::string& filename) {  
-    return filename == "main.cpp" || filename == "main.exe" || filename == ".git" || filename == "build"; }
+    return filename == "main.cpp" || filename == "main.exe" || filename == ".git" || filename == "build" || filename=="log.json" || filename=="commit_info.txt"; }
 
 void revertDirectory(const fs::directory_entry& source, const std::string& destinationPath) {
     if (fs::exists(destinationPath)) {
@@ -222,7 +281,6 @@ void revertFile(const fs::directory_entry& source, const std::string& destinatio
     }
     fs::copy(source.path(), destinationPath);
 }
-
 
 
     /*void copyToStaging(const fs::path& source, const std::string& destination) {
@@ -243,18 +301,72 @@ void revertFile(const fs::directory_entry& source, const std::string& destinatio
 
 };*/
 
-private:     bool isIgnored(const std::string& filename) const {       return filename == "main.cpp" || filename == "main.exe" || filename == ".git";     }     
-void copyToStaging(const fs::path& source, const std::string& destination) {         std::string destinationPath = destination + source.filename().string();         if (fs::exists(destinationPath)) {             try {                 fs::remove_all(destinationPath);             } catch (const std::exception& e) {                 std::cerr << "Error removing existing file or directory: " << e.what() << std::endl;             }         }         fs::copy(source, destination + source.filename().string(), fs::copy_options::recursive);     } };
+void revert(const std::string& commitId) {
+    std::string logPath = "log.json";
+    std::ifstream inFile(logPath);
+    if (!inFile.is_open()) {
+        std::cerr << "Error: Unable to open log.json.\n";
+        return;
+    }
+
+    std::string logContent((std::istreambuf_iterator<char>(inFile)),
+                            std::istreambuf_iterator<char>());
+    inFile.close();
+
+    // Check if commitId exists in the log
+    if (logContent.find("\"" + commitId + "\":{") == std::string::npos) {
+        std::cerr << "Error: The commit id " << commitId << " does not exist.\n";
+        return;
+    }
+
+    // Construct the path to the commit folder
+    std::string commitFolderPath = "./.git/commits/" + commitId;
+    if (!fs::exists(commitFolderPath) || !fs::is_directory(commitFolderPath)) {
+        std::cerr << "Error: The commit folder for " << commitId << " does not exist.\n";
+        return;
+    }
+
+    // Iterate through the files in the commit folder
+    for (const auto& file : fs::directory_iterator(commitFolderPath)) {
+        fs::path filePath = file.path();
+        std::string filename = filePath.filename().string();
+
+        if (!shouldIgnore(filename)) {
+            fs::path targetPath = filename; // Assumes the main folder is the current working directory
+
+            // Remove the file if it already exists in the main folder
+            if (fs::exists(targetPath)) {
+                fs::remove(targetPath);
+            }
+
+            // Copy file from commit folder to the main folder
+            try {
+                fs::copy(filePath, targetPath);
+            } catch (const fs::filesystem_error& e) {
+                std::cerr << "Error copying file " << filePath << ": " << e.what() << '\n';
+            }
+        }
+    }
+
+    std::cout << "Reverted to commit " << commitId << ".\n";
+}
+
+private:     bool isIgnored(const std::string& filename) const { return filename == "main.cpp" || filename == "main.exe" || filename == ".git" || filename == "log.json";     }     
+void copyToStaging(const fs::path& source, const std::string& destination) {         std::string destinationPath = destination + source.filename().string();         if (fs::exists(destinationPath)) {             try {                 fs::remove_all(destinationPath);             } catch (const std::exception& e) {                 std::cerr << "Error removing existing file or directory: " << e.what() << std::endl;             }         }         fs::copy(source, destination + source.filename().string(), fs::copy_options::recursive);     }
+
+
+
+ };
 
 int main() {
     VersionControl vcs;
 
     // Example usage
-    //vcs.init();
+    // vcs.init();
 
 // 
     vcs.add(".");
-    vcs.commit("commit information");
+    vcs.commit("commit after revert");
 
     // Make changes to files...
 
@@ -264,7 +376,7 @@ int main() {
     // vcs.commit("Add file.txt");
 
     // Revert to the initial commit
-    // vcs.revert(".git/commits/1703627053");
+    // vcs.revert("1703728492");
 
     return 0;
 }

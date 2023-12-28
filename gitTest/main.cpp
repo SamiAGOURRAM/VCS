@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <vector>
-
+#include <sstream>
 
 namespace fs = std::filesystem;
 using namespace std::chrono;
@@ -71,51 +71,61 @@ std::string getFileHash(const fs::path& path) {
 }
 
 
-bool addInLog(const std::string& commitFolder, const std::string& author, const std::string& date,
-              const std::string& message, size_t filesChanged, size_t filesCreated) {
-    std::string logPath = "log.json";
-    std::ifstream inFile(logPath);
-    std::stringstream buffer;
+    bool addInLog(std::string commitFolder, std::string author, std::string date,
+                  const std::string& message, size_t filesChanged, size_t filesCreated) {
+        std::string logPath = "log.json";
+        std::ifstream inFile(logPath);
+        std::stringstream buffer;
 
-    // Read the existing content
-    if (inFile.is_open()) {
-        buffer << inFile.rdbuf();
-        inFile.close();
+        // Read the existing content
+        if (inFile.is_open()) {
+            buffer << inFile.rdbuf();
+            inFile.close();
+        }
+
+        std::string logContent = buffer.str();
+
+        // Extracting only the last part of the commitFolder
+        std::string commitId = commitFolder.substr(commitFolder.find_last_of("/") + 1);
+
+        // Remove newline from the date if it exists
+        date.erase(std::remove(date.begin(), date.end(), '\n'), date.end());
+
+        // Constructing the new log entry
+        std::string entry = "\"" + commitId + "\":{"
+                                              "\"Author\":\"" + author + "\","
+                                                                         "\"Date\":\"" + date + "\","
+                                                                                                "\"Message\":\"" + message + "\","
+                                                                                                                             "\"Files Changed\":" + std::to_string(filesChanged) + ","
+                                                                                                                                                                                   "\"Files Created\":" + std::to_string(filesCreated) + "}";
+
+        // Add new entry to the log
+        if (logContent.empty() || logContent == "{}") {  // Handle empty log file
+            logContent = "{" + entry + "}";
+        } else {
+            // Append new entry before the last closing brace
+            size_t insertPos = logContent.rfind('}');
+            if (insertPos != std::string::npos) {
+                logContent.insert(insertPos, "," + entry);
+            } else {
+                // If the file is not empty and does not contain a closing brace,
+                // there's a format error in the file.
+                std::cerr << "Error: log.json format error.\n";
+                return false;
+            }
+        }
+
+        // Write the updated content back to the file
+        std::ofstream outFile(logPath);
+        if (outFile.is_open()) {
+            outFile << logContent;
+            outFile.close();
+            return true;
+        } else {
+            std::cerr << "Error: Unable to open log.json for writing.\n";
+            return false;
+        }
     }
-
-    std::string logContent = buffer.str();
-
-    // Extracting only the last part of the commitFolder
-    std::string commitId = commitFolder.substr(commitFolder.find_last_of("/") + 1);
-
-    // Constructing the new log entry
-    std::string entry = "\"" + commitId + "\":{"
-                        "\"Author\":\"" + author + "\","
-                        "\"Date\":\"" + date + "\","
-                        "\"Message\":\"" + message + "\","
-                        "\"Files Changed\":" + std::to_string(filesChanged) + ","
-                        "\"Files Created\":" + std::to_string(filesCreated) + "}";
-
-    // Add new entry to the log
-    if (logContent.empty() || logContent == "{}") {  // Handle empty log file
-        logContent = "{" + entry + "}";
-    } else {
-        // Append new entry before the last closing brace
-        size_t insertPos = logContent.rfind('}');
-        logContent.insert(insertPos, "," + entry);
-    }
-
-    // Write the updated content back to the file
-    std::ofstream outFile(logPath);
-    if (outFile.is_open()) {
-        outFile << logContent;
-        outFile.close();
-        return true;
-    } else {
-        std::cerr << "Error: Unable to open log.json for writing.\n";
-        return false;
-    }
-}
 void add(const std::string& path) {
     const auto copyOptions = fs::copy_options::overwrite_existing | fs::copy_options::recursive;
 
@@ -242,7 +252,7 @@ void commit(const std::string& message) {
         // ...
 
         commitFile << "Author: <Your Name>\n";
-        commitFile << "Date: " << std::ctime(&timestamp);
+        commitFile << "Date: " << std::ctime(reinterpret_cast<const time_t *>(&timestamp));
         commitFile << "Message: " << message << "\n";
         commitFile << "Files Changed: " << modifiedFiles.size() + newFiles.size()  << "\n";
         commitFile << "Files Created: " << newFiles.size() << "\n";
@@ -254,7 +264,7 @@ void commit(const std::string& message) {
     }
 
     std::string authorName = "<Your Name>"; // Replace with actual author name or variable
-    std::string dateString = std::ctime(&timestamp); // Convert timestamp to readable date
+    std::string dateString = std::ctime(reinterpret_cast<const time_t *>(&timestamp)); // Convert timestamp to readable date
 
     // After a successful commit:
     if (addInLog(commitFolder, authorName, dateString, message, modifiedFiles.size(), newFiles.size())) {
@@ -362,7 +372,7 @@ int main() {
     VersionControl vcs;
 
     // Example usage
-    // vcs.init();
+     vcs.init();
 
 // 
     vcs.add(".");

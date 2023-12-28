@@ -75,6 +75,62 @@ void VCS::add(const std::string& path) {
 }
 
 
+bool VCS::addInLog(std::string commitFolder, std::string author, std::string date,
+                  const std::string& message, size_t filesChanged, size_t filesCreated) {
+        std::string logPath = "log.json";
+        std::ifstream inFile(logPath);
+        std::stringstream buffer;
+
+        // Read the existing content
+        if (inFile.is_open()) {
+            buffer << inFile.rdbuf();
+            inFile.close();
+        }
+
+        std::string logContent = buffer.str();
+
+        // Extracting only the last part of the commitFolder
+        std::string commitId = commitFolder.substr(commitFolder.find_last_of("/") + 1);
+
+        // Remove newline from the date if it exists
+        date.erase(std::remove(date.begin(), date.end(), '\n'), date.end());
+
+        // Constructing the new log entry
+        std::string entry = "\"" + commitId + "\":{"
+                                              "\"Author\":\"" + author + "\","
+                                                                         "\"Date\":\"" + date + "\","
+                                                                                                "\"Message\":\"" + message + "\","
+                                                                                                                             "\"Files Changed\":" + std::to_string(filesChanged) + ","
+                                                                                                                                                                                   "\"Files Created\":" + std::to_string(filesCreated) + "}";
+
+        // Add new entry to the log
+        if (logContent.empty() || logContent == "{}") {  // Handle empty log file
+            logContent = "{" + entry + "}";
+        } else {
+            // Append new entry before the last closing brace
+            size_t insertPos = logContent.rfind('}');
+            if (insertPos != std::string::npos) {
+                logContent.insert(insertPos, "," + entry);
+            } else {
+                // If the file is not empty and does not contain a closing brace,
+                // there's a format error in the file.
+                std::cerr << "Error: log.json format error.\n";
+                return false;
+            }
+        }
+
+        // Write the updated content back to the file
+        std::ofstream outFile(logPath);
+        if (outFile.is_open()) {
+            outFile << logContent;
+            outFile.close();
+            return true;
+        } else {
+            std::cerr << "Error: Unable to open log.json for writing.\n";
+            return false;
+        }
+    }
+
 
 
 void VCS::commit(const std::string& message) {
@@ -138,7 +194,6 @@ void VCS::commit(const std::string& message) {
         std::cerr << "Failed to log commit.\n";
     }
 }
-
 
 
 void VCS::revert(const std::string& commitId) {
@@ -236,59 +291,7 @@ fs::path VCS::findLastCommitFile(const std::string& filename) {
 }
 
 
-    bool VCS::addInLog(const std::string& commitFolder, const std::string& author, const std::string& date,
-              const std::string& message, size_t filesChanged, size_t filesCreated) {
-        // Initialize paths and files
-        std::string logPath = "log.json";
-        std::ifstream inFile(logPath);
-        std::stringstream buffer;
-
-        // Read the existing content
-        if (inFile.is_open()) {
-            buffer << inFile.rdbuf();
-            inFile.close();
-        }
-
-        std::string logContent = buffer.str();
-        std::string entry = "\"" + commitFolder + "\":{"
-                                                  "\"Author\":\"" + author + "\","
-                                                                             "\"Date\":\"" + date + "\","
-                                                                                                    "\"Message\":\"" + message + "\","
-                                                                                                                                 "\"Files Changed\":" + std::to_string(filesChanged) + ","
-                                                                                                                                                                                       "\"Files Created\":" + std::to_string(filesCreated) + "}";
-
-        // Insert or update the log entry
-        size_t pos = logContent.find(commitFolder);
-        if (pos != std::string::npos) {
-            // Update existing entry
-            size_t startPos = logContent.rfind('{', pos);
-            size_t endPos = logContent.find('}', pos) + 1;
-            logContent.replace(startPos, endPos - startPos, entry);
-        } else {
-            // Add new entry
-            if (logContent.empty()) {
-                logContent = "{" + entry + "}";
-            } else {
-                // Insert new entry before the last closing brace
-                size_t insertPos = logContent.rfind('}');
-                logContent.insert(insertPos, "," + entry);
-            }
-        }
-
-        // Write the updated content back to the file
-        std::ofstream outFile(logPath);
-        if (outFile.is_open()) {
-            outFile << logContent;
-            outFile.close();
-            return true;
-        } else {
-            std::cerr << "Error: Unable to open log.json for writing.\n";
-            return false;
-        }
-    }
-
-
-    std::vector<std::string> readFileLines(const std::string& filePath) {
+    std::vector<std::string> VCS::readFileLines(const std::string& filePath) {
     std::vector<std::string> lines;
     std::ifstream file(filePath);
     std::string line;
@@ -320,16 +323,16 @@ void VCS::writeDifferences(const std::string& oldFilePath, const std::string& ne
 
 
 }   
-void writeNewFileContents(const std::string& filePath, std::ofstream& commitFile) {
+void VCS::writeNewFileContents(const std::string& filePath, std::ofstream& commitFile) {
     auto lines = readFileLines(filePath);
     for (const auto& line : lines) {
         commitFile << "+ " << line << "\n";
     }
 }
-bool shouldIgnore(const std::string& filename) {  
+bool VCS::shouldIgnore(const std::string& filename) {  
         return filename == "main.cpp" || filename == "main.exe" || filename == ".git" || filename == "build" || filename=="log.json" || filename=="commit_info.txt"; }
     
-void revertDirectory(const fs::directory_entry& source, const std::string& destinationPath) {
+void VCS::revertDirectory(const fs::directory_entry& source, const std::string& destinationPath) {
     if (fs::exists(destinationPath)) {
         fs::remove_all(destinationPath);  // Remove existing directory
     }

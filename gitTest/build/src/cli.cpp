@@ -1,10 +1,54 @@
 #include "cli.h"
 #include <iostream>
+#include <sstream>
+#include <vector>
+#include <iterator>
 
 CLI::CLI(VCS& controller) : vcsController(controller) {}
 
+void CLI::start() {
+    std::string line;
+    while (true) {
+        std::cout << "> ";
+        std::getline(std::cin, line);
+
+        if (line == "exit") {
+            break;
+        }
+
+        std::istringstream iss(line);
+        std::vector<std::string> args;
+        std::string arg;
+        bool inQuotes = false;
+
+        // Custom parsing to handle quoted arguments
+        while (iss >> std::ws) {  // std::ws to eat up any leading whitespace
+            char next = iss.peek();
+            if (next == '\"') {
+                inQuotes = !inQuotes;
+                iss.get();  // Eat the quote
+                std::getline(iss, arg, inQuotes ? '\"' : ' ');
+                args.push_back(arg);
+            } else {
+                iss >> arg;
+                args.push_back(arg);
+            }
+        }
+
+        // Convert vector of strings to array of char* for compatibility with parseAndExecute
+        std::vector<char*> argv;
+        for (auto& arg : args) {
+            argv.push_back(&arg.front());
+        }
+
+        parseAndExecute(argv.size(), argv.data());
+    }
+}
+
+
 void CLI::parseAndExecute(int argc, char** argv) {
-    if (argc < 2) {
+    if (argc < 2 || std::string(argv[0]) != "um6p") {
+        std::cerr << "Error: All commands must start with 'um6p'\n";
         displayUsage();
         return;
     }
@@ -12,24 +56,29 @@ void CLI::parseAndExecute(int argc, char** argv) {
     std::string command = argv[1];
 
     if (command == "init") {
+        if (argc != 2) {
+            std::cerr << "Error: 'init' command takes no additional arguments\n";
+            displayUsage();
+            return;
+        }
         handleInitCommand();
     } else if (command == "add") {
-        if (argc < 3) {
-            std::cerr << "Error: No file specified for 'add' command\n";
+        if (argc != 3) {
+            std::cerr << "Error: 'add' command requires exactly one filename argument\n";
             displayUsage();
             return;
         }
         handleAddCommand(argv[2]);
     } else if (command == "commit") {
-        if (argc < 3) {
-            std::cerr << "Error: No commit message specified\n";
+        if (argc != 3) {
+            std::cerr << "Error: 'commit' command requires exactly one message argument\n";
             displayUsage();
             return;
         }
         handleCommitCommand(argv[2]);
     } else if (command == "rollback") {
-        if (argc < 3) {
-            std::cerr << "Error: No commit ID specified for 'rollback' command\n";
+        if (argc != 3) {
+            std::cerr << "Error: 'rollback' command requires exactly one commit ID argument\n";
             displayUsage();
             return;
         }
@@ -39,6 +88,8 @@ void CLI::parseAndExecute(int argc, char** argv) {
         displayUsage();
     }
 }
+
+
 
 void CLI::handleInitCommand() const {
     vcsController.init();

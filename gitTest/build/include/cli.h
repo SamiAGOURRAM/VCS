@@ -7,6 +7,7 @@
 class CLI {
 public:
     CLI(VCS& controller);
+    void start();
 
     // Parses and executes the given command line arguments
     void parseAndExecute(int argc, char** argv);

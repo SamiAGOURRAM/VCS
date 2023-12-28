@@ -24,7 +24,7 @@ public:
     void add(const std::string& filename);
     void commit(const std::string& message);
     void revert(const std::string& commitID);
-    void log() const;
+    void log();
 
 private:
     fs::path findLastCommitFile(const std::string& filename);

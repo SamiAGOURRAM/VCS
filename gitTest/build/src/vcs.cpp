@@ -10,6 +10,8 @@
 #include <vector>
 
 
+
+
 namespace fs = std::filesystem;
 using namespace std::chrono;
 
@@ -341,3 +343,70 @@ void VCS::revertDirectory(const fs::directory_entry& source, const std::string& 
 
 bool VCS::isIgnored(const std::string& filename) const {     return filename == "main.cpp" || filename == "main.exe" || filename == ".git" || filename == "build" || filename=="log.json" || filename=="commit_info.txt"; }
 void VCS::copyToStaging(const fs::path& source, const std::string& destination) {         std::string destinationPath = destination + source.filename().string();         if (fs::exists(destinationPath)) {             try {                 fs::remove_all(destinationPath);             } catch (const std::exception& e) {                 std::cerr << "Error removing existing file or directory: " << e.what() << std::endl;             }         }         fs::copy(source, destination + source.filename().string(), fs::copy_options::recursive);     };
+
+
+void VCS::log() {
+        std::string logPath = "log.json";
+        std::ifstream inFile(logPath);
+
+        if (!inFile.is_open()) {
+            std::cerr << "Error: Unable to open log.json for reading." << std::endl;
+            return;
+        }
+
+        std::string logContent((std::istreambuf_iterator<char>(inFile)),
+                               std::istreambuf_iterator<char>());
+        inFile.close();
+
+        // Split the content at '},' to get individual commit entries
+        std::istringstream iss(logContent);
+        std::string entry;
+        while (std::getline(iss, entry, '}')) {
+            // Skip empty lines and the final closing brace
+            if (entry.empty() || entry.find('{') == std::string::npos) {
+                continue;
+            }
+
+            // Add back the removed closing brace for parsing
+            entry += '}';
+
+            // Trim leading/trailing whitespaces and other formatting
+            entry.erase(std::remove(entry.begin(), entry.end(), '\n'), entry.end());
+            entry.erase(std::remove(entry.begin(), entry.end(), '\t'), entry.end());
+
+            // Find the commit ID and print it
+            size_t commitStart = entry.find_first_of("\"") + 1;
+            size_t commitEnd = entry.find("\":{");
+            if (commitStart != std::string::npos && commitEnd != std::string::npos) {
+                std::cout << "Commit ID: " << entry.substr(commitStart, commitEnd - commitStart) << std::endl;
+            }
+
+            // Extract and print each attribute
+            size_t startPos = entry.find_first_of('{') + 1;
+            size_t endPos = entry.find_last_of('}');
+            if (startPos != std::string::npos && endPos != std::string::npos) {
+                std::string attributes = entry.substr(startPos, endPos - startPos);
+
+                // Split the attributes at ',' to get key-value pairs
+                std::istringstream attrStream(attributes);
+                std::string attribute;
+                while (std::getline(attrStream, attribute, ',')) {
+                    size_t colonPos = attribute.find(':');
+                    if (colonPos != std::string::npos) {
+                        std::string key = attribute.substr(0, colonPos);
+                        key.erase(std::remove(key.begin(), key.end(), '\"'), key.end()); // Remove quotes
+
+                        std::string value = attribute.substr(colonPos + 1);
+                        value.erase(std::remove(value.begin(), value.end(), '\"'), value.end()); // Remove quotes
+
+                        // Print the key-value pair
+                        std::cout << key << ": " << value << std::endl;
+                    }
+                }
+            }
+
+            // Print two newlines between entries
+            std::cout << std::endl << std::endl;
+        }
+    }
+

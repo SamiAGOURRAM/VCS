@@ -20,6 +20,7 @@ private:
     void handleAddCommand(const std::string& filename) const;
     void handleCommitCommand(const std::string& message) const;
     void handleRollbackCommand(const std::string& commitId) const;
+    void handleLogCommand () const;
 
     // Utility method to display usage information
     void displayUsage() const;

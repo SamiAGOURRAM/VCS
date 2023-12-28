@@ -62,6 +62,14 @@ void CLI::parseAndExecute(int argc, char** argv) {
             return;
         }
         handleInitCommand();
+    }else if (command == "log"){
+        if (argc != 2) {
+            std::cerr << "Error: log command takes no additional arguments\n";
+            displayUsage();
+            return;
+        }
+        handleLogCommand();
+
     } else if (command == "add") {
         if (argc != 3) {
             std::cerr << "Error: 'add' command requires exactly one filename argument\n";
@@ -111,6 +119,11 @@ void CLI::handleRollbackCommand(const std::string& commitId) const {
     std::cout << "Rolled back to commit: "  << std::endl;
 }
 
+void CLI::handleLogCommand () const{
+
+    vcsController.log();
+
+}
 void CLI::displayUsage() const {
     std::cout << "Usage: MiniVCS [command] [arguments]\n"
               << "Commands:\n"
@@ -119,3 +132,5 @@ void CLI::displayUsage() const {
               << "  commit [message]             Commit changes\n"
               << "  rollback [commit_id]         Rollback to a previous commit\n";
 }
+
+

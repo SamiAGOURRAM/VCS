@@ -58,12 +58,15 @@ VCS::VCS() : basePath("") {
                 std::cout << "file "<<filename << std::endl;
                 if (!shouldIgnore(filename)) {
                     std::string destinationPath = basePath + "/.git/staging/" + filename;
-                    fs::path lastCommitFile = findLastCommitFile(basePath+"/"+filename);
+                    fs::path lastCommitFile = findLastCommitFile(filename);
 
                     try {
                         bool shouldCopy = true;
                         if (!lastCommitFile.empty()) {
+
                             std::string lastCommitHash = getFileHash(lastCommitFile);
+                            std::cout << lastCommitFile << std::endl;
+                            std::cout << entry.path()<<std::endl;
                             std::string currentFileHash = getFileHash(entry.path());
                             shouldCopy = (lastCommitHash != currentFileHash);
                         }
@@ -168,6 +171,7 @@ VCS::VCS() : basePath("") {
                 fs::path lastCommitFile = findLastCommitFile(filename);
 
                 if (!lastCommitFile.empty()) {
+                    std::cout << "dkhlna hna"<<std::endl;
                     if (getFileHash(entry.path()) != getFileHash(lastCommitFile)) {
                         modifiedFiles.push_back(filename);
                         // Write differences for modified files
@@ -182,7 +186,7 @@ VCS::VCS() : basePath("") {
                 std::cout << commitFolder << std::endl;
                 std::cout << entry.path()<<std::endl;
                 std::cout << filename << std::endl;
-                fs::copy(commitFolder, entry.path());
+                fs::copy(entry.path(), commitFolder + "/" + filename);
             }
 
             // Logic to find deleted files would go here
@@ -231,7 +235,7 @@ VCS::VCS() : basePath("") {
         }
 
         // Construct the path to the commit folder
-        std::string commitFolderPath = basePath + "/./.git/commits/" + commitId;
+        std::string commitFolderPath = basePath + "/.git/commits/" + commitId;
         if (!fs::exists(commitFolderPath) || !fs::is_directory(commitFolderPath)) {
             std::cerr << "Error: The commit folder for " << commitId << " does not exist.\n";
             return;
@@ -263,30 +267,31 @@ VCS::VCS() : basePath("") {
     }
 
 
-    fs::path VCS::findLastCommitFile(const std::string &filename) {
+fs::path VCS::findLastCommitFile(const std::string &filename) {
+    std::vector<fs::path> commitFolders;
 
-        std::vector <fs::path> commitFolders;
-
-        // Gather all commit folders
-        for (const auto &entry: fs::directory_iterator(basePath+"/.git/commits")) {
-            if (entry.is_directory()) {
-                commitFolders.push_back(entry.path());
-            }
+    // Gather all commit folders
+    for (const auto &entry : fs::directory_iterator(basePath + "/.git/commits")) {
+        if (entry.is_directory()) {
+            commitFolders.push_back(entry.path());
         }
-
-        // Sort commit folders by timestamp in descending order
-        std::sort(commitFolders.rbegin(), commitFolders.rend());
-
-        // Iterate through commit folders to find the most recent file
-        for (const auto &folder: commitFolders) {
-            fs::path potentialFile = folder / filename;
-            if (fs::exists(potentialFile)) {
-                return potentialFile;
-            }
-        }
-
-        return fs::path(); // Return an empty path if not found
     }
+
+    // Sort commit folders by timestamp in descending order
+    std::sort(commitFolders.rbegin(), commitFolders.rend());
+
+    // Iterate through commit folders to find the most recent file
+    for (const auto &folder : commitFolders) {
+        std::cout << folder << std::endl;
+        fs::path potentialFile = folder / filename;
+        if (fs::exists(potentialFile)) {
+            std::cout << "Found file: " << potentialFile << std::endl;
+            return potentialFile;
+        }
+    }
+
+    return fs::path(); // Return an empty path if not found
+}
 
 
     std::string VCS::getFileHash(const fs::path &path) {

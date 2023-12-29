@@ -247,15 +247,17 @@ VCS::VCS() : basePath("") {
             std::string filename = filePath.filename().string();
 
             if (!shouldIgnore(filename)) {
-                fs::path targetPath = filename; // Assumes the main folder is the current working directory
+                fs::path targetPath = basePath; // Assumes the main folder is the current working directory
 
                 // Remove the file if it already exists in the main folder
-                if (fs::exists(targetPath)) {
-                    fs::remove(targetPath);
+                if (fs::exists(targetPath / filename)) {
+                    fs::remove(targetPath / filename);
                 }
 
                 // Copy file from commit folder to the main folder
                 try {
+                    std::cout <<"fp "<< filePath <<std::endl;
+                    std::cout << "tp "<<targetPath << std::endl;
                     fs::copy(filePath, targetPath);
                 } catch (const fs::filesystem_error &e) {
                     std::cerr << "Error copying file " << filePath << ": " << e.what() << '\n';

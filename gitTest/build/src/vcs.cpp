@@ -71,7 +71,7 @@ VCS::VCS() : basePath("") {
                             if (fs::exists(destinationPath)) {
                                 fs::remove_all(destinationPath);
                             }
-                            std::cout << "Adding file : " << entry.path();
+                            std::cout << "Adding file : " << entry.path() << std::endl;
                             fs::copy(entry.path(), destinationPath, copyOptions);
                         } else {
                             std::cout << "Nothing changed in file : " << destinationPath << std::endl;
@@ -259,7 +259,7 @@ VCS::VCS() : basePath("") {
             }
         }
 
-        std::cout << "Reverted to commit " << commitId << ".\n";
+        std::cout << "Reverted to commit " << commitId << std::endl;
     }
 
 

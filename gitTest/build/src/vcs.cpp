@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <vector>
+#include <functional>
 
 
 
@@ -85,7 +86,6 @@ VCS::VCS() : basePath("") {
         if (relativePath == ".") {
             // Add all files and directories in the current directory to the staging area
             for (const auto &entry: fs::directory_iterator(basePath)) {
-                std::cout << entry.path()<<std::endl;
                 processEntry(entry);
             }
         } else {
@@ -288,23 +288,45 @@ fs::path VCS::findLastCommitFile(const std::string &filename) {
 }
 
 
-    std::string VCS::getFileHash(const fs::path &path) {
-        std::ifstream fileStream(path, std::ios::binary);
-        if (!fileStream) {
-            throw std::runtime_error("Cannot open file: " + path.string());
-        }
-
-        std::ostringstream ss;
-        ss << fileStream.rdbuf();
-        std::string fileContent = ss.str();
-
-        std::hash <std::string> hasher;
-        size_t hashValue = hasher(fileContent);
-
-        std::stringstream hashStream;
-        hashStream << hashValue;
-        return hashStream.str();
+    std::string VCS::getFileHash(const fs::path& path) {
+    if (!fs::exists(path)) {
+        throw std::runtime_error("Path does not exist: " + path.string());
     }
+
+    if (fs::is_directory(path)) {
+        return hashDirectory(path);
+    } else {
+        return hashFile(path);
+    }
+}
+
+std::string VCS::hashFile(const fs::path& path) {
+    std::ifstream fileStream(path, std::ios::binary);
+    if (!fileStream) {
+        throw std::runtime_error("Cannot open file: " + path.string());
+    }
+
+    std::ostringstream ss;
+    ss << fileStream.rdbuf();
+    std::string fileContent = ss.str();
+
+    std::hash<std::string> hasher;
+    return std::to_string(hasher(fileContent));
+}
+
+std::string VCS::hashDirectory(const fs::path& dirPath) {
+    std::hash<std::string> hasher;
+    size_t combinedHash = 0;
+
+    for (const auto& entry : fs::recursive_directory_iterator(dirPath)) {
+        if (fs::is_regular_file(entry)) {
+            std::string fileHash = hashFile(entry.path());
+            combinedHash ^= hasher(fileHash) + 0x9e3779b9 + (combinedHash << 6) + (combinedHash >> 2);  // A simple hash combination formula
+        }
+    }
+
+    return std::to_string(combinedHash);
+}
 
 
     std::vector <std::string> VCS::readFileLines(const std::string &filePath) {

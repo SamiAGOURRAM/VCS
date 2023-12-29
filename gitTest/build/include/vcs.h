@@ -40,6 +40,8 @@ private:
     void copyToStaging(const fs::path& source, const std::string& destination);
     bool addInLog(std::string commitFolder, std::string author, std::string date,
                   const std::string& message, size_t filesChanged, size_t filesCreated);
+    std::string hashFile(const fs::path& path);
+    std::string hashDirectory(const fs::path& dirPath);
 
 };
 

@@ -22,9 +22,7 @@ VCS::VCS() : basePath("") {
 
 // Default constructor
     void VCS::init(const std::string &path) {
-        basePath = fs::absolute(path);
-        std::cout << basePath<<std::endl;// Set the base path when initializing
-
+        basePath = fs::absolute(path).string();
         // Ensure the base path exists
         if (!fs::exists(basePath)) {
             fs::create_directories(basePath);
@@ -55,7 +53,6 @@ VCS::VCS() : basePath("") {
         auto processEntry = [&](const fs::directory_entry &entry) {
             if (entry.is_regular_file() || entry.is_directory()) {
                 std::string filename = entry.path().filename().string();
-                std::cout << "file "<<filename << std::endl;
                 if (!shouldIgnore(filename)) {
                     std::string destinationPath = basePath + "/.git/staging/" + filename;
                     fs::path lastCommitFile = findLastCommitFile(filename);
@@ -65,8 +62,6 @@ VCS::VCS() : basePath("") {
                         if (!lastCommitFile.empty()) {
 
                             std::string lastCommitHash = getFileHash(lastCommitFile);
-                            std::cout << lastCommitFile << std::endl;
-                            std::cout << entry.path()<<std::endl;
                             std::string currentFileHash = getFileHash(entry.path());
                             shouldCopy = (lastCommitHash != currentFileHash);
                         }
@@ -75,9 +70,10 @@ VCS::VCS() : basePath("") {
                             if (fs::exists(destinationPath)) {
                                 fs::remove_all(destinationPath);
                             }
+                            std::cout << "Adding file : " << entry.path();
                             fs::copy(entry.path(), destinationPath, copyOptions);
                         } else {
-                            std::cout << "should not copy";
+                            std::cout << "Nothing changed in file : " << destinationPath << std::endl;
                         }
                     } catch (const std::exception &e) {
                         std::cerr << "Error processing file or directory: " << e.what() << std::endl;
@@ -171,7 +167,6 @@ VCS::VCS() : basePath("") {
                 fs::path lastCommitFile = findLastCommitFile(filename);
 
                 if (!lastCommitFile.empty()) {
-                    std::cout << "dkhlna hna"<<std::endl;
                     if (getFileHash(entry.path()) != getFileHash(lastCommitFile)) {
                         modifiedFiles.push_back(filename);
                         // Write differences for modified files
@@ -218,6 +213,7 @@ VCS::VCS() : basePath("") {
 
 
     void VCS::revert(const std::string &commitId) {
+        const auto copyOptions = fs::copy_options::overwrite_existing | fs::copy_options::recursive;
         std::string logPath = basePath + "/log.json";
         std::ifstream inFile(logPath);
         if (!inFile.is_open()) {
@@ -250,15 +246,13 @@ VCS::VCS() : basePath("") {
                 fs::path targetPath = basePath; // Assumes the main folder is the current working directory
 
                 // Remove the file if it already exists in the main folder
-                if (fs::exists(targetPath / filename)) {
+                if (fs::exists(targetPath / filename)) { 
                     fs::remove(targetPath / filename);
                 }
 
                 // Copy file from commit folder to the main folder
                 try {
-                    std::cout <<"fp "<< filePath <<std::endl;
-                    std::cout << "tp "<<targetPath << std::endl;
-                    fs::copy(filePath, targetPath);
+                    fs::copy(filePath, targetPath / filename, copyOptions);
                 } catch (const fs::filesystem_error &e) {
                     std::cerr << "Error copying file " << filePath << ": " << e.what() << '\n';
                 }
@@ -284,10 +278,8 @@ fs::path VCS::findLastCommitFile(const std::string &filename) {
 
     // Iterate through commit folders to find the most recent file
     for (const auto &folder : commitFolders) {
-        std::cout << folder << std::endl;
         fs::path potentialFile = folder / filename;
         if (fs::exists(potentialFile)) {
-            std::cout << "Found file: " << potentialFile << std::endl;
             return potentialFile;
         }
     }

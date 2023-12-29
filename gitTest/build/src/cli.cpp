@@ -101,22 +101,18 @@ void CLI::parseAndExecute(int argc, char** argv) {
 
 void CLI::handleInitCommand(const std::string& path) const {
     vcsController.init(path);
-    std::cout << "Repository initialized." << std::endl;
 }
 
 void CLI::handleAddCommand(const std::string& filename) const {
     vcsController.add(filename);
-    std::cout << "File added: " << filename << std::endl;
 }
 
 void CLI::handleCommitCommand(const std::string& message) const {
     vcsController.commit(message);
-    std::cout << "Changes committed with message: " << message << std::endl;
 }
 
 void CLI::handleRollbackCommand(const std::string& commitId) const {
     vcsController.revert(commitId);
-    std::cout << "Rolled back to commit: "  << std::endl;
 }
 
 void CLI::handleLogCommand () const{
@@ -127,7 +123,7 @@ void CLI::handleLogCommand () const{
 void CLI::displayUsage() const {
     std::cout << "Usage: MiniVCS [command] [arguments]\n"
               << "Commands:\n"
-              << "  init                         Initialize a new repository\n"
+              << "  init [path]                  Initialize a new repository in the path\n"
               << "  add [file]                   Add a file to the staging area\n"
               << "  commit [message]             Commit changes\n"
               << "  rollback [commit_id]         Rollback to a previous commit\n";

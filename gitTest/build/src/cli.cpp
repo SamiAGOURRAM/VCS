@@ -56,12 +56,12 @@ void CLI::parseAndExecute(int argc, char** argv) {
     std::string command = argv[1];
 
     if (command == "init") {
-        if (argc != 2) {
+        if (argc != 3) {
             std::cerr << "Error: 'init' command takes no additional arguments\n";
             displayUsage();
             return;
         }
-        handleInitCommand();
+        handleInitCommand(argv[2]);
     }else if (command == "log"){
         if (argc != 2) {
             std::cerr << "Error: log command takes no additional arguments\n";
@@ -99,8 +99,8 @@ void CLI::parseAndExecute(int argc, char** argv) {
 
 
 
-void CLI::handleInitCommand() const {
-    vcsController.init();
+void CLI::handleInitCommand(const std::string& path) const {
+    vcsController.init(path);
     std::cout << "Repository initialized." << std::endl;
 }
 

@@ -17,16 +17,18 @@ using namespace std::chrono;
 
 
 class VCS {
+
 public:
     VCS();
 
-    void init();
+    void init(const std::string &path);
     void add(const std::string& filename);
     void commit(const std::string& message);
     void revert(const std::string& commitID);
     void log();
 
 private:
+    std::string basePath;
     fs::path findLastCommitFile(const std::string& filename);
     std::string getFileHash(const fs::path& path);
     std::vector<std::string> readFileLines(const std::string& filePath);

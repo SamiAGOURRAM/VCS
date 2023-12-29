@@ -16,7 +16,7 @@ private:
     VCS& vcsController;
 
     // Private helper methods for handling specific commands
-    void handleInitCommand() const;
+    void handleInitCommand(const std::string& path) const;
     void handleAddCommand(const std::string& filename) const;
     void handleCommitCommand(const std::string& message) const;
     void handleRollbackCommand(const std::string& commitId) const;
